@@ -1,0 +1,960 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f0f0f">
+  <title>Inventario Móvil Premium</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+  <link rel="manifest" href='data:application/manifest+json,{"name":"Inventario Móvil","short_name":"Inventario","start_url":".","display":"standalone","background_color":"#0f0f0f","theme_color":"#00d4ff","icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icon-512.png","sizes":"512x512","type":"image/png"}]}'>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --primary-dark: #0a0a0a;
+      --secondary-dark: #1c1c1c;
+      --accent-color: #00d4ff;
+      --text-color: #f5f5f5;
+      --error-color: #ff4d4d;
+      --success-color: #28a745;
+      --warning-color: #ffa500;
+      --glass-bg: rgba(255, 255, 255, 0.08);
+      --card-bg: rgba(255, 255, 255, 0.05);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      --glow: 0 0 15px rgba(0, 212, 255, 0.5);
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --3d-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), 0 12px 40px rgba(0, 212, 255, 0.3);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, var(--primary-dark), var(--secondary-dark), #2a2a2a, var(--primary-dark));
+      background-size: 800%;
+      animation: gradient 25s ease infinite;
+      color: var(--text-color);
+      min-height: 100vh;
+      padding: 1.5rem;
+      position: relative;
+      overflow-x: hidden;
+      font-weight: 400;
+      perspective: 1000px;
+    }
+
+    .starfield {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 8px 8px;
+      animation: twinkle 15s ease-in-out infinite;
+    }
+
+    @keyframes gradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.6; }
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px) rotateX(-10deg); }
+      to { opacity: 1; transform: translateY(0) rotateX(0deg); }
+    }
+
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      z-index: 1;
+      transform-style: preserve-3d;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      text-align: center;
+      font-weight: 700;
+      background: linear-gradient(45deg, var(--accent-color), #ffffff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: glow 3s ease-in-out infinite alternate;
+      transform: translateZ(20px);
+    }
+
+    @keyframes glow {
+      from { text-shadow: 0 0 10px var(--accent-color), 0 0 20px var(--accent-color); }
+      to { text-shadow: 0 0 20px var(--accent-color), 0 0 40px var(--accent-color); }
+    }
+
+    .form-section, .exchange-rate-section, .search-section, .summary-section {
+      background: var(--card-bg);
+      backdrop-filter: blur(15px);
+      padding: 1.5rem;
+      border-radius: 20px;
+      box-shadow: var(--3d-shadow);
+      animation: fadeIn 0.5s ease;
+      transform: translateZ(20px);
+      transform-style: preserve-3d;
+    }
+
+    .form-section:hover, .exchange-rate-section:hover, .search-section:hover, .summary-section:hover {
+      transform: translateZ(30px) rotateX(5deg);
+    }
+
+    .form-group {
+      margin-bottom: 1.2rem;
+      position: relative;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--text-color);
+      transform: translateZ(10px);
+    }
+
+    input {
+      width: 100%;
+      padding: 0.8rem;
+      border: none;
+      border-radius: 10px;
+      background: var(--card-bg);
+      color: var(--text-color);
+      font-size: 1rem;
+      box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.2);
+      transition: var(--transition);
+      transform: translateZ(10px);
+    }
+
+    input:focus {
+      outline: none;
+      box-shadow: 0 0 10px var(--accent-color);
+      background: var(--glass-bg);
+      transform: translateZ(15px);
+    }
+
+    button {
+      position: relative;
+      width: 100%;
+      padding: 0.9rem;
+      border: none;
+      border-radius: 12px;
+      background: var(--accent-color);
+      color: var(--text-color);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 5px 20px rgba(0, 212, 255, 0.5);
+      overflow: hidden;
+      transition: var(--transition);
+      touch-action: manipulation;
+      transform: translateZ(20px);
+    }
+
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+      transform: translateZ(10px);
+    }
+
+    button::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.4s ease, height 0.4s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateZ(30px) translateY(-3px) rotateX(10deg);
+      box-shadow: 0 8px 25px rgba(0, 212, 255, 0.7);
+    }
+
+    button:active::after {
+      width: 200%;
+      height: 200%;
+    }
+
+    .spinner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      border: 3px solid var(--text-color);
+      border-top: 3px solid var(--accent-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      transform: translate(-50%, -50%);
+    }
+
+    .table-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      transform: translateZ(20px);
+    }
+
+    .table-container.export-mode {
+      overflow: visible;
+      width: auto;
+    }
+
+    .inventory-table {
+      width: 100%;
+      min-width: 800px;
+      border-collapse: collapse;
+      background: var(--glass-bg);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: var(--3d-shadow);
+      table-layout: auto;
+      transform-style: preserve-3d;
+    }
+
+    .inventory-table.export-mode {
+      background: #000000;
+      color: #ffffff;
+      min-width: 0;
+      width: auto;
+    }
+
+    .inventory-table.export-mode th,
+    .inventory-table.export-mode td {
+      color: #ffffff;
+      background: #000000;
+    }
+
+    .inventory-table.export-mode .stock-bar {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .inventory-table.export-mode .stock-bar-fill {
+      background: var(--accent-color);
+    }
+
+    .inventory-table.export-mode .stock-bar-fill.low-stock {
+      background: var(--warning-color);
+    }
+
+    th, td {
+      padding: 1rem;
+      text-align: left;
+      font-size: 0.9rem;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      transform: translateZ(10px);
+    }
+
+    th {
+      background: rgba(0, 212, 255, 0.25);
+      cursor: pointer;
+      transition: var(--transition);
+      transform: translateZ(15px);
+    }
+
+    th:hover {
+      background: rgba(0, 212, 255, 0.35);
+      transform: translateZ(20px);
+    }
+
+    th[aria-sort="ascending"]::after {
+      content: ' ↑';
+    }
+
+    th[aria-sort="descending"]::after {
+      content: ' ↓';
+    }
+
+    tr {
+      animation: fadeIn 0.5s ease;
+      transition: var(--transition);
+      transform: translateZ(10px);
+    }
+
+    tr:hover {
+      transform: translateZ(20px) rotateX(5deg);
+      background: rgba(0, 212, 255, 0.1);
+    }
+
+    tr.low-stock td {
+      background: rgba(255, 165, 0, 0.2);
+    }
+
+    .stock-bar {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      height: 10px;
+      max-width: 100px;
+      width: 100%;
+      overflow: hidden;
+      margin-top: 0.3rem;
+      transform: translateZ(15px);
+    }
+
+    .stock-bar-fill {
+      background: var(--accent-color);
+      height: 100%;
+      transition: width 0.6s ease;
+    }
+
+    .stock-bar-fill.low-stock {
+      background: var(--warning-color);
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: nowrap;
+    }
+
+    .actions button {
+      width: auto;
+      padding: 0.6rem;
+      font-size: 0.85rem;
+    }
+
+    .delete-btn {
+      background: var(--error-color);
+      box-shadow: 0 5px 20px rgba(255, 77, 77, 0.5);
+    }
+
+    .delete-btn:hover:not(:disabled) {
+      box-shadow: 0 8px 25px rgba(255, 77, 77, 0.7);
+      transform: translateZ(30px) rotateX(10deg);
+    }
+
+    .error, .success, .undo {
+      font-size: 0.85rem;
+      text-align: center;
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 8px;
+      animation: fadeIn 0.5s ease;
+      transform: translateZ(10px);
+    }
+
+    .error {
+      color: var(--error-color);
+      background: rgba(255, 77, 77, 0.1);
+      animation: shake 0.4s ease;
+    }
+
+    .success {
+      color: var(--success-color);
+      background: rgba(40, 167, 69, 0.1);
+    }
+
+    .undo {
+      color: var(--accent-color);
+      background: rgba(0, 212, 255, 0.1);
+      cursor: pointer;
+    }
+
+    .summary-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 1rem;
+      text-align: center;
+    }
+
+    .summary-card {
+      background: var(--card-bg);
+      padding: 1rem;
+      border-radius: 12px;
+      box-shadow: var(--3d-shadow);
+      animation: fadeIn 0.5s ease;
+      transform: translateZ(20px);
+      transition: var(--transition);
+    }
+
+    .summary-card:hover {
+      transform: translateZ(30px) rotateX(5deg);
+    }
+
+    .summary-card h3 {
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+      transform: translateZ(10px);
+    }
+
+    .summary-card p {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--accent-color);
+      transform: translateZ(15px);
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 1.8rem; }
+      th, td { font-size: 0.85rem; padding: 0.8rem; }
+      button { font-size: 0.95rem; }
+      .form-section, .exchange-rate-section, .search-section, .summary-section { padding: 1.2rem; }
+      .summary-section { grid-template-columns: 1fr; }
+      .stock-bar { max-width: 80px; }
+      .inventory-table { font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="starfield"></div>
+  <div class="container">
+    <h1>Inventario Móvil Premium</h1>
+
+    <div class="summary-section">
+      <div class="summary-card">
+        <h3>Total Productos</h3>
+        <p id="totalItems">0</p>
+      </div>
+      <div class="summary-card">
+        <h3>Total Stock</h3>
+        <p id="totalStock">0</p>
+      </div>
+      <div class="summary-card">
+        <h3>Valor Total (VES)</h3>
+        <p id="totalValueVES">0.00</p>
+      </div>
+      <div class="summary-card">
+        <h3>Valor Total (USD)</h3>
+        <p id="totalValueUSD">0.00</p>
+      </div>
+    </div>
+
+    <div class="exchange-rate-section">
+      <div class="form-group">
+        <label for="exchangeRate">Precio del dólar en bolívares (VES):</label>
+        <input type="number" id="exchangeRate" step="0.01" min="0" placeholder="Ej. 36.50" aria-label="Tasa de cambio USD a VES">
+        <button onclick="saveExchangeRate()" aria-label="Guardar tasa de cambio">Guardar Tasa</button>
+      </div>
+      <div id="exchangeRateError" class="error"></div>
+    </div>
+
+    <div class="search-section">
+      <div class="form-group">
+        <label for="search">Buscar producto:</label>
+        <input type="text" id="search" placeholder="Escribe para filtrar..." aria-label="Buscar productos por nombre">
+      </div>
+      <div class="form-group">
+        <button id="exportPdfBtn" onclick="exportToPDF()" aria-label="Exportar inventario como PDF con confirmación">Exportar PDF</button>
+        <button id="exportImageBtn" onclick="exportToImage()" aria-label="Exportar inventario como imagen con confirmación">Exportar Imagen</button>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-group">
+        <label for="itemName">Nombre del producto:</label>
+        <input type="text" id="itemName" placeholder="Ej. Camiseta" aria-label="Nombre del producto">
+      </div>
+      <div class="form-group">
+        <label for="priceVES">Precio en bolívares (VES):</label>
+        <input type="number" id="priceVES" step="0.01" min="0" placeholder="Ej. 730.00" aria-label="Precio en bolívares">
+      </div>
+      <div class="form-group">
+        <label for="stock">Cantidad en stock:</label>
+        <input type="number" id="stock" min="0" placeholder="Ej. 10" aria-label="Cantidad en stock">
+      </div>
+      <button onclick="addOrUpdateItem()" aria-label="Agregar o actualizar producto">Agregar Producto</button>
+      <div id="formError" class="error"></div>
+      <div id="formSuccess" class="success"></div>
+      <div id="undoMessage" class="undo" onclick="undoDelete()" role="button" aria-label="Deshacer eliminación"></div>
+    </div>
+
+    <div class="table-container">
+      <table class="inventory-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('name')" aria-sort="none">Nombre</th>
+            <th onclick="sortTable('priceVES')" aria-sort="none">Precio por Unidad (VES)</th>
+            <th onclick="sortTable('priceUSD')" aria-sort="none">Precio por Unidad (USD)</th>
+            <th onclick="sortTable('stock')" aria-sort="none">Stock</th>
+            <th onclick="sortTable('totalVES')" aria-sort="none">Total (VES)</th>
+            <th onclick="sortTable('totalUSD')" aria-sort="none">Total (USD)</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="inventoryBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script type="module">
+    class InventoryManager {
+      #items = [];
+      #exchangeRate = 1;
+      #sortKey = 'name';
+      #sortDirection = 1;
+      #searchQuery = '';
+      #deletedItem = null;
+      #undoTimeout = null;
+      #searchTimeout = null;
+
+      constructor() {
+        this.loadFromStorage();
+        this.renderTable();
+        this.updateSummary();
+        this.setupSearch();
+      }
+
+      loadFromStorage() {
+        const savedItems = localStorage.getItem('inventory');
+        const savedRate = localStorage.getItem('exchangeRate');
+        if (savedItems) this.#items = JSON.parse(savedItems);
+        if (savedRate) this.#exchangeRate = parseFloat(savedRate);
+        document.getElementById('exchangeRate').value = this.#exchangeRate;
+      }
+
+      saveToStorage() {
+        localStorage.setItem('inventory', JSON.stringify(this.#items));
+      }
+
+      saveExchangeRate(rate) {
+        if (!rate || rate <= 0) throw new Error('La tasa debe ser mayor a 0');
+        this.#exchangeRate = rate;
+        localStorage.setItem('exchangeRate', rate);
+        this.#items = this.#items.map(item => ({
+          ...item,
+          priceUSD: parseFloat((item.priceVES / this.#exchangeRate).toFixed(2)),
+        }));
+        this.saveToStorage();
+        this.renderTable();
+        this.updateSummary();
+        this.showSuccess('Tasa actualizada correctamente');
+      }
+
+      addItem({ name, priceVES, stock }) {
+        if (!name.trim() || priceVES <= 0 || stock < 0 || isNaN(priceVES) || isNaN(stock)) {
+          throw new Error('Por favor, completa todos los campos correctamente');
+        }
+        this.#items.push({
+          id: crypto.randomUUID(),
+          name: name.trim(),
+          priceVES: parseFloat(priceVES),
+          priceUSD: parseFloat((priceVES / this.#exchangeRate).toFixed(2)),
+          stock: parseInt(stock),
+        });
+        this.saveToStorage();
+        this.renderTable();
+        this.updateSummary();
+        this.showSuccess('Producto agregado correctamente');
+      }
+
+      updateItem(id, { name, priceVES, stock }) {
+        if (!name.trim() || priceVES <= 0 || stock < 0 || isNaN(priceVES) || isNaN(stock)) {
+          throw new Error('Por favor, completa todos los campos correctamente');
+        }
+        const index = this.#items.findIndex(item => item.id === id);
+        if (index === -1) return;
+        this.#items[index] = {
+          ...this.#items[index],
+          name: name.trim(),
+          priceVES: parseFloat(priceVES),
+          priceUSD: parseFloat((priceVES / this.#exchangeRate).toFixed(2)),
+          stock: parseInt(stock),
+        };
+        this.saveToStorage();
+        this.renderTable();
+        this.updateSummary();
+        this.showSuccess('Producto actualizado correctamente');
+      }
+
+      deleteItem(id) {
+        const index = this.#items.findIndex(item => item.id === id);
+        if (index === -1) return;
+        this.#deletedItem = { ...this.#items[index], index };
+        this.#items.splice(index, 1);
+        clearTimeout(this.#undoTimeout);
+        this.saveToStorage();
+        this.renderTable();
+        this.updateSummary();
+        this.showUndo(`Producto "${this.#deletedItem.name}" eliminado. Deshacer`);
+      }
+
+      undoDelete() {
+        if (!this.#deletedItem) return;
+        this.#items.splice(this.#deletedItem.index, 0, this.#deletedItem);
+        this.#deletedItem = null;
+        clearTimeout(this.#undoTimeout);
+        this.saveToStorage();
+        this.renderTable();
+        this.updateSummary();
+        this.showSuccess('Eliminación deshecha');
+      }
+
+      getItemById(id) {
+        return this.#items.find(item => item.id === id);
+      }
+
+      setupSearch() {
+        const searchInput = document.getElementById('search');
+        searchInput.addEventListener('input', () => {
+          clearTimeout(this.#searchTimeout);
+          this.#searchTimeout = setTimeout(() => {
+            this.#searchQuery = searchInput.value.toLowerCase();
+            this.renderTable();
+          }, 300);
+        });
+      }
+
+      confirmExport(type) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const defaultName = `inventario_${timestamp}`;
+        if (!window.confirm(`¿Desea descargar el archivo como ${type.toUpperCase()}? El navegador mostrará un diálogo para elegir la ubicación.`)) {
+          return { proceed: false };
+        }
+        let filename = window.prompt(`Ingrese el nombre del archivo (sin extensión):`, defaultName);
+        if (!filename) return { proceed: false };
+        filename = filename.replace(/[^a-zA-Z0-9-_]/g, '').trim();
+        if (!filename) filename = defaultName;
+        return { proceed: true, filename: `${filename}.${type}` };
+      }
+
+      async exportToPDF() {
+        if (this.#items.length === 0) {
+          this.showError('No hay productos para exportar');
+          return;
+        }
+        const exportBtn = document.getElementById('exportPdfBtn');
+        exportBtn.disabled = true;
+        exportBtn.innerHTML = '<span class="spinner"></span>';
+        try {
+          const { proceed, filename } = this.confirmExport('pdf');
+          if (!proceed) {
+            exportBtn.disabled = false;
+            exportBtn.innerHTML = 'Exportar PDF';
+            return;
+          }
+          if (!window.jspdf || !window.jspdf.jsPDF) {
+            throw new Error('La biblioteca jsPDF no está cargada');
+          }
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF();
+          doc.setFont('Helvetica', 'normal');
+          doc.setFontSize(16);
+          doc.text('Inventario Móvil Premium', 20, 20);
+          doc.setFontSize(12);
+          doc.text(`Fecha: ${new Date().toLocaleString()}`, 20, 30);
+          if (!doc.autoTable) {
+            throw new Error('El plugin jspdf-autotable no está cargado');
+          }
+          doc.autoTable({
+            head: [['Nombre', 'Precio por Unidad (VES)', 'Precio por Unidad (USD)', 'Stock', 'Total (VES)', 'Total (USD)']],
+            body: this.#items.map(item => [
+              item.name,
+              item.priceVES.toFixed(2),
+              item.priceUSD.toFixed(2),
+              item.stock,
+              (item.priceVES * item.stock).toFixed(2),
+              (item.priceUSD * item.stock).toFixed(2),
+            ]),
+            startY: 40,
+            theme: 'grid',
+            styles: { font: 'Helvetica', fontSize: 10, textColor: [0, 0, 0] },
+            headStyles: { fillColor: [0, 212, 255], textColor: [255, 255, 255] },
+            margin: { top: 40 },
+          });
+          doc.save(filename);
+          this.showSuccess('Inventario exportado como PDF');
+        } catch (error) {
+          console.error('Error en exportToPDF:', error);
+          this.showError('Error al exportar PDF: ' + error.message);
+        } finally {
+          exportBtn.disabled = false;
+          exportBtn.innerHTML = 'Exportar PDF';
+        }
+      }
+
+      async exportToImage() {
+        if (this.#items.length === 0) {
+          this.showError('No hay productos para exportar');
+          return;
+        }
+        const tableContainer = document.querySelector('.table-container');
+        const table = document.querySelector('.inventory-table');
+        const exportBtn = document.getElementById('exportImageBtn');
+        exportBtn.disabled = true;
+        exportBtn.innerHTML = '<span class="spinner"></span>';
+        try {
+          const { proceed, filename } = this.confirmExport('png');
+          if (!proceed) {
+            exportBtn.disabled = false;
+            exportBtn.innerHTML = 'Exportar Imagen';
+            return;
+          }
+          // Temporarily adjust styles for full table capture
+          tableContainer.classList.add('export-mode');
+          table.classList.add('export-mode');
+          const originalContainerStyle = tableContainer.style.cssText;
+          const originalTableStyle = table.style.cssText;
+          tableContainer.style.overflow = 'visible';
+          tableContainer.style.width = 'auto';
+          table.style.minWidth = '0';
+          table.style.width = 'auto';
+          // Compute table dimensions
+          const rect = table.getBoundingClientRect();
+          const canvas = await html2canvas(tableContainer, {
+            backgroundColor: '#000000',
+            scale: 2,
+            useCORS: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: Math.max(rect.width, 800),
+            windowHeight: rect.height,
+          });
+          const imgData = canvas.toDataURL('image/png');
+          const a = document.createElement('a');
+          a.href = imgData;
+          a.download = filename;
+          a.click();
+          this.showSuccess('Inventario exportado como imagen');
+        } catch (error) {
+          console.error('Error en exportToImage:', error);
+          this.showError('Error al exportar imagen: ' + error.message);
+        } finally {
+          // Restore original styles
+          tableContainer.classList.remove('export-mode');
+          table.classList.remove('export-mode');
+          tableContainer.style.cssText = originalContainerStyle;
+          table.style.cssText = originalTableStyle;
+          exportBtn.disabled = false;
+          exportBtn.innerHTML = 'Exportar Imagen';
+        }
+      }
+
+      sortTable(key) {
+        this.#sortKey = key;
+        this.#sortDirection = this.#sortKey === key ? -this.#sortDirection : 1;
+        this.#items.sort((a, b) => {
+          let valueA = a[key];
+          let valueB = b[key];
+          if (key === 'totalVES') {
+            valueA = a.priceVES * a.stock;
+            valueB = b.priceVES * b.stock;
+          } else if (key === 'totalUSD') {
+            valueA = a.priceUSD * a.stock;
+            valueB = b.priceUSD * b.stock;
+          }
+          return typeof valueA === 'string'
+            ? valueA.localeCompare(valueB) * this.#sortDirection
+            : (valueA - valueB) * this.#sortDirection;
+        });
+        this.renderTable();
+        this.updateTableSortAttributes();
+      }
+
+      updateTableSortAttributes() {
+        const headers = document.querySelectorAll('.inventory-table th');
+        headers.forEach(header => {
+          const key = header.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+          if (key === this.#sortKey) {
+            header.setAttribute('aria-sort', this.#sortDirection === 1 ? 'ascending' : 'descending');
+          } else {
+            header.setAttribute('aria-sort', 'none');
+          }
+        });
+      }
+
+      updateSummary() {
+        const totalItems = this.#items.length;
+        const totalStock = this.#items.reduce((sum, item) => sum + item.stock, 0);
+        const totalValueVES = this.#items.reduce((sum, item) => sum + item.priceVES * item.stock, 0);
+        const totalValueUSD = this.#items.reduce((sum, item) => sum + item.priceUSD * item.stock, 0);
+        document.getElementById('totalItems').textContent = totalItems;
+        document.getElementById('totalStock').textContent = totalStock;
+        document.getElementById('totalValueVES').textContent = totalValueVES.toFixed(2);
+        document.getElementById('totalValueUSD').textContent = totalValueUSD.toFixed(2);
+      }
+
+      showSuccess(message) {
+        const successDiv = document.getElementById('formSuccess');
+        successDiv.textContent = message;
+        setTimeout(() => (successDiv.textContent = ''), 3000);
+      }
+
+      showError(message) {
+        const errorDiv = document.getElementById('formError');
+        errorDiv.textContent = message;
+        setTimeout(() => (errorDiv.textContent = ''), 3000);
+      }
+
+      showUndo(message) {
+        const undoDiv = document.getElementById('undoMessage');
+        undoDiv.textContent = message;
+        clearTimeout(this.#undoTimeout);
+        this.#undoTimeout = setTimeout(() => {
+          undoDiv.textContent = '';
+          this.#deletedItem = null;
+        }, 5000);
+      }
+
+      renderTable() {
+        const tbody = document.getElementById('inventoryBody');
+        tbody.innerHTML = '';
+        const filteredItems = this.#items.filter(item =>
+          item.name.toLowerCase().includes(this.#searchQuery)
+        );
+        for (const item of filteredItems) {
+          const row = document.createElement('tr');
+          const stockPercentage = Math.min((item.stock / 100) * 100, 100);
+          const isLowStock = item.stock < 5;
+          row.className = isLowStock ? 'low-stock' : '';
+          const highlightedName = this.#searchQuery
+            ? item.name.replace(
+                new RegExp(this.#searchQuery, 'gi'),
+                match => `<span style="background: rgba(0, 212, 255, 0.3);">${match}</span>`
+              )
+            : item.name;
+          const totalVES = (item.priceVES * item.stock).toFixed(2);
+          const totalUSD = (item.priceUSD * item.stock).toFixed(2);
+          row.innerHTML = `
+            <td>${highlightedName}</td>
+            <td>${item.priceVES.toFixed(2)} VES</td>
+            <td>${item.priceUSD.toFixed(2)} USD</td>
+            <td>
+              ${item.stock}
+              <div class="stock-bar"><div class="stock-bar-fill ${isLowStock ? 'low-stock' : ''}" style="width: ${stockPercentage}%"></div></div>
+            </td>
+            <td>${totalVES} VES</td>
+            <td>${totalUSD} USD</td>
+            <td class="actions">
+              <button onclick="editItem('${item.id}')" aria-label="Editar ${item.name}">Editar</button>
+              <button class="delete-btn" onclick="deleteItem('${item.id}')" aria-label="Eliminar ${item.name}">Eliminar</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        }
+      }
+    }
+
+    const manager = new InventoryManager();
+
+    window.saveExchangeRate = () => {
+      const rateInput = document.getElementById('exchangeRate');
+      const errorDiv = document.getElementById('exchangeRateError');
+      try {
+        const rate = parseFloat(rateInput.value);
+        manager.saveExchangeRate(rate);
+        errorDiv.textContent = '';
+      } catch (error) {
+        manager.showError(error.message);
+      }
+    };
+
+    window.addOrUpdateItem = () => {
+      const name = document.getElementById('itemName').value;
+      const priceVES = parseFloat(document.getElementById('priceVES').value);
+      const stock = parseInt(document.getElementById('stock').value);
+      try {
+        const itemData = { name, priceVES, stock };
+        const editingId = document.getElementById('itemName').dataset.editingId;
+        if (editingId) {
+          manager.updateItem(editingId, itemData);
+          delete document.getElementById('itemName').dataset.editingId;
+        } else {
+          manager.addItem(itemData);
+        }
+        document.getElementById('itemName').value = '';
+        document.getElementById('priceVES').value = '';
+        document.getElementById('stock').value = '';
+      } catch (error) {
+        manager.showError(error.message);
+      }
+    };
+
+    window.editItem = (id) => {
+      const item = manager.getItemById(id);
+      if (!item) return;
+      document.getElementById('itemName').value = item.name;
+      document.getElementById('priceVES').value = item.priceVES;
+      document.getElementById('stock').value = item.stock;
+      document.getElementById('itemName').dataset.editingId = id;
+    };
+
+    window.deleteItem = (id) => {
+      if (confirm('¿Seguro que deseas eliminar este producto?')) {
+        manager.deleteItem(id);
+      }
+    };
+
+    window.undoDelete = () => manager.undoDelete();
+
+    window.sortTable = (key) => manager.sortTable(key);
+
+    window.exportToPDF = () => manager.exportToPDF();
+
+    window.exportToImage = () => manager.exportToImage();
+  </script>
+</body>
+</html>
